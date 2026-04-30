@@ -30,7 +30,7 @@ const Layout = () => {
               <span>{user.name}</span>
               <strong>{user.role}</strong>
             </div>
-            <button className="ghost-button" onClick={logout} type="button">
+            <button className="ghost-button" onClick={() => logout()} type="button">
               Logout
             </button>
           </div>

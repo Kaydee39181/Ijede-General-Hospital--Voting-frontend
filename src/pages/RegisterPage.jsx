@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { getFriendlyApiErrorMessage } from '../utils/apiError';
 import { validateCredentials } from '../utils/validation';
 
 const RegisterPage = () => {
@@ -38,7 +39,7 @@ const RegisterPage = () => {
 
       navigate('/vote', { replace: true });
     } catch (error) {
-      setServerError(error.response?.data?.message || error.message || 'Unable to register.');
+      setServerError(getFriendlyApiErrorMessage(error, 'Unable to register.'));
     }
   };
 

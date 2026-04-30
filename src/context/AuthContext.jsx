@@ -177,7 +177,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = (notice = '') => {
-    performLogout(notice);
+    performLogout(typeof notice === 'string' ? notice : '');
   };
 
   const clearAuthNotice = () => {

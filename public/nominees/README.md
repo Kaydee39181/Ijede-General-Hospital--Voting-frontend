@@ -1,14 +1,22 @@
-Place nominee photos here.
+Place nominee photos here for the voter ballot cards.
 
-Recommended approach:
-- one file per nominee
-- use clear lowercase filenames with hyphens
+Current mapped files:
+- `ADNS_Balogun_A.jpeg`
+- `ADNS_Jetawo.jpeg`
+- `ADNS_Salami.jpeg`
+- `CNO_Adetunji.jpeg`
+- `CNO_Ismail.jpeg`
+- `CNO_Ojo_Oyeyemi.jpeg`
+- `CNO_Olorunnimbe.jpeg`
+- `CNO_Oyefeso.jpeg`
+- `NO_II_Ajisafe.jpeg`
+- `NO_II_Emode.jpeg`
+- `SNO_Abeeb.jpeg`
+- `SNO_Akintola.jpeg`
 
-Examples:
-- adns-balogun-a.jpg
-- adns-jetawo.jpg
-- cno-oyefeso.jpg
-- no-i-abeeb.jpg
-
-If some nominees do not have photos yet, that's fine.
-You can add them later and I can wire them in incrementally.
+Nominees still using a fallback placeholder until their photos are added:
+- `ADNS Adeyiolu`
+- `CNO Otayomi`
+- `NO I Pelemo`
+- `SN Hassan`
+- `SN Adegboye`

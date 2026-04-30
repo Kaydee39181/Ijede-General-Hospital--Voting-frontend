@@ -1,4 +1,31 @@
-import { memo } from 'react';
+import { memo, useEffect, useState } from 'react';
+import { getNomineeInitials, getNomineePhoto } from '../utils/nomineeMedia';
+
+const NomineeAvatar = ({ option }) => {
+  const nomineePhoto = getNomineePhoto(option);
+  const [showFallback, setShowFallback] = useState(!nomineePhoto);
+
+  useEffect(() => {
+    setShowFallback(!nomineePhoto);
+  }, [nomineePhoto]);
+
+  if (showFallback) {
+    return (
+      <span className="nominee-photo nominee-photo-fallback" aria-hidden="true">
+        {getNomineeInitials(option)}
+      </span>
+    );
+  }
+
+  return (
+    <img
+      alt=""
+      className="nominee-photo"
+      onError={() => setShowFallback(true)}
+      src={nomineePhoto}
+    />
+  );
+};
 
 const PollCard = ({
   field,
@@ -42,8 +69,16 @@ const PollCard = ({
               onClick={() => onVote(field.id, option)}
               type="button"
             >
-              <span>{option}</span>
-              {isSelected ? <strong>Your vote</strong> : null}
+              <div className="option-media" aria-hidden="true">
+                <NomineeAvatar option={option} />
+              </div>
+              <div className="option-copy">
+                <span className="option-name">{option}</span>
+                <span className="option-hint">
+                  {hasVoted ? 'Selection locked for this category.' : 'Tap to cast your vote.'}
+                </span>
+              </div>
+              {isSelected ? <strong className="option-state">Your vote</strong> : null}
             </button>
           );
         })}

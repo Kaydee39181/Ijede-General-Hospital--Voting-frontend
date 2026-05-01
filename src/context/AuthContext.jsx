@@ -11,14 +11,26 @@ import { connectSocket, disconnectSocket, onSocketStateChanged } from '../servic
 
 const AuthContext = createContext(null);
 const BACKEND_RECOVERY_WINDOW_MS = 60000;
+const AWAY_LOGOUT_WINDOW_MS = 2 * 60 * 1000;
 const AUTH_STORAGE_KEY = 'realtime-voting-auth';
+const AWAY_STATE_KEY = 'realtime-voting-away-state';
+
+const clearLegacyAuthStorage = () => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  window.localStorage.removeItem(AUTH_STORAGE_KEY);
+};
 
 const readStoredAuth = () => {
   if (typeof window === 'undefined') {
     return { token: null, user: null };
   }
 
-  const storedValue = window.localStorage.getItem(AUTH_STORAGE_KEY);
+  clearLegacyAuthStorage();
+
+  const storedValue = window.sessionStorage.getItem(AUTH_STORAGE_KEY);
 
   if (!storedValue) {
     return { token: null, user: null };
@@ -28,7 +40,7 @@ const readStoredAuth = () => {
     const parsed = JSON.parse(storedValue);
 
     if (typeof parsed?.token !== 'string' || !parsed.token || !parsed?.user) {
-      window.localStorage.removeItem(AUTH_STORAGE_KEY);
+      window.sessionStorage.removeItem(AUTH_STORAGE_KEY);
       return { token: null, user: null };
     }
 
@@ -37,7 +49,7 @@ const readStoredAuth = () => {
       user: parsed.user
     };
   } catch (error) {
-    window.localStorage.removeItem(AUTH_STORAGE_KEY);
+    window.sessionStorage.removeItem(AUTH_STORAGE_KEY);
     return { token: null, user: null };
   }
 };
@@ -48,15 +60,66 @@ const writeStoredAuth = (authState) => {
   }
 
   if (!authState?.token || !authState?.user) {
-    window.localStorage.removeItem(AUTH_STORAGE_KEY);
+    window.sessionStorage.removeItem(AUTH_STORAGE_KEY);
+    clearLegacyAuthStorage();
     return;
   }
 
-  window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(authState));
+  window.sessionStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(authState));
+  clearLegacyAuthStorage();
 };
 
 const buildDeviceConflictError = (activeUser) =>
   new Error(`This device is already signed in as ${activeUser}. Log out there first.`);
+
+const readAwayState = () => {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  const storedValue = window.sessionStorage.getItem(AWAY_STATE_KEY);
+
+  if (!storedValue) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(storedValue);
+
+    if (!Number.isFinite(parsed?.hiddenAt)) {
+      window.sessionStorage.removeItem(AWAY_STATE_KEY);
+      return null;
+    }
+
+    return {
+      hiddenAt: parsed.hiddenAt
+    };
+  } catch (error) {
+    window.sessionStorage.removeItem(AWAY_STATE_KEY);
+    return null;
+  }
+};
+
+const writeAwayState = (hiddenAt) => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  window.sessionStorage.setItem(
+    AWAY_STATE_KEY,
+    JSON.stringify({
+      hiddenAt
+    })
+  );
+};
+
+const clearAwayState = () => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  window.sessionStorage.removeItem(AWAY_STATE_KEY);
+};
 
 export const AuthProvider = ({ children }) => {
   const [authState, setAuthState] = useState(readStoredAuth);
@@ -65,6 +128,7 @@ export const AuthProvider = ({ children }) => {
   const [backendOutage, setBackendOutage] = useState(null);
   const backendTimeoutRef = useRef(null);
   const backendIntervalRef = useRef(null);
+  const awayTimeoutRef = useRef(null);
 
   useEffect(() => {
     if (authState.token) {
@@ -107,8 +171,17 @@ export const AuthProvider = ({ children }) => {
     setBackendOutage(null);
   };
 
+  const clearAwayLogoutTimer = () => {
+    if (awayTimeoutRef.current) {
+      window.clearTimeout(awayTimeoutRef.current);
+      awayTimeoutRef.current = null;
+    }
+  };
+
   const performLogout = (notice = '') => {
     clearBackendOutage();
+    clearAwayLogoutTimer();
+    clearAwayState();
     releaseDeviceLock();
     setAuthState({ token: null, user: null });
     setAuthNotice(notice);
@@ -127,6 +200,8 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     if (!authState.token) {
       clearBackendOutage();
+      clearAwayLogoutTimer();
+      clearAwayState();
       return undefined;
     }
 
@@ -181,6 +256,95 @@ export const AuthProvider = ({ children }) => {
     };
   }, [authState.token]);
 
+  useEffect(() => {
+    if (!authState.token) {
+      clearAwayLogoutTimer();
+      clearAwayState();
+      return undefined;
+    }
+
+    const logoutForAwayState = () => {
+      performLogout('You were signed out after leaving the site for more than 2 minutes.');
+    };
+
+    const syncAwayState = () => {
+      const awayState = readAwayState();
+
+      if (!awayState) {
+        clearAwayLogoutTimer();
+        return;
+      }
+
+      const elapsedMs = Date.now() - awayState.hiddenAt;
+
+      if (elapsedMs >= AWAY_LOGOUT_WINDOW_MS) {
+        logoutForAwayState();
+        return;
+      }
+
+      clearAwayLogoutTimer();
+      awayTimeoutRef.current = window.setTimeout(
+        logoutForAwayState,
+        AWAY_LOGOUT_WINDOW_MS - elapsedMs
+      );
+    };
+
+    const handleHidden = () => {
+      writeAwayState(Date.now());
+      syncAwayState();
+    };
+
+    const handleVisible = () => {
+      const awayState = readAwayState();
+
+      if (awayState && Date.now() - awayState.hiddenAt >= AWAY_LOGOUT_WINDOW_MS) {
+        logoutForAwayState();
+        return;
+      }
+
+      clearAwayLogoutTimer();
+      clearAwayState();
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        handleHidden();
+        return;
+      }
+
+      handleVisible();
+    };
+
+    const handlePageHide = () => {
+      writeAwayState(Date.now());
+    };
+
+    const handlePageShow = () => {
+      if (document.visibilityState === 'visible') {
+        handleVisible();
+      } else {
+        syncAwayState();
+      }
+    };
+
+    if (document.visibilityState === 'hidden') {
+      syncAwayState();
+    } else {
+      handleVisible();
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('pagehide', handlePageHide);
+    window.addEventListener('pageshow', handlePageShow);
+
+    return () => {
+      clearAwayLogoutTimer();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('pagehide', handlePageHide);
+      window.removeEventListener('pageshow', handlePageShow);
+    };
+  }, [authState.token]);
+
   const persistAuth = (payload) => {
     const lockResult = claimDeviceLock(payload.user.name);
 
@@ -189,6 +353,7 @@ export const AuthProvider = ({ children }) => {
     }
 
     setAuthNotice('');
+    clearAwayState();
     setAuthState({
       token: payload.token,
       user: payload.user

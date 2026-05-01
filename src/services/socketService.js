@@ -13,6 +13,21 @@ const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || getDefaultSocketUrl();
 
 let socket;
 let subscribedFieldIds = [];
+let socketConnected = false;
+
+const socketStateListeners = new Set();
+const pollUpdatedListeners = new Set();
+const adminResultsUpdatedListeners = new Set();
+const creatorVotesUpdatedListeners = new Set();
+
+const notifyListeners = (listeners, payload) => {
+  listeners.forEach((listener) => listener(payload));
+};
+
+const setSocketConnected = (connected) => {
+  socketConnected = connected;
+  notifyListeners(socketStateListeners, connected);
+};
 
 const emitFieldSubscriptions = () => {
   if (!socket || !subscribedFieldIds.length) {
@@ -22,32 +37,84 @@ const emitFieldSubscriptions = () => {
   socket.emit('fields:subscribe', subscribedFieldIds);
 };
 
+const handleConnect = () => {
+  setSocketConnected(true);
+  emitFieldSubscriptions();
+};
+
+const handleDisconnect = () => {
+  setSocketConnected(false);
+};
+
+const handleConnectError = (error) => {
+  setSocketConnected(false);
+
+  if (typeof console !== 'undefined') {
+    console.error('[socket] connect_error', error?.message || error);
+  }
+};
+
+const handlePollUpdated = (payload) => {
+  notifyListeners(pollUpdatedListeners, payload);
+};
+
+const handleAdminResultsUpdated = (payload) => {
+  notifyListeners(adminResultsUpdatedListeners, payload);
+};
+
+const handleCreatorVotesUpdated = (payload) => {
+  notifyListeners(creatorVotesUpdatedListeners, payload);
+};
+
+const detachSocketListeners = (activeSocket) => {
+  if (!activeSocket) {
+    return;
+  }
+
+  activeSocket.off('connect', handleConnect);
+  activeSocket.off('disconnect', handleDisconnect);
+  activeSocket.off('connect_error', handleConnectError);
+  activeSocket.off('poll:updated', handlePollUpdated);
+  activeSocket.off('admin:resultsUpdated', handleAdminResultsUpdated);
+  activeSocket.off('creator:votesUpdated', handleCreatorVotesUpdated);
+};
+
+const attachSocketListeners = (activeSocket) => {
+  activeSocket.on('connect', handleConnect);
+  activeSocket.on('disconnect', handleDisconnect);
+  activeSocket.on('connect_error', handleConnectError);
+  activeSocket.on('poll:updated', handlePollUpdated);
+  activeSocket.on('admin:resultsUpdated', handleAdminResultsUpdated);
+  activeSocket.on('creator:votesUpdated', handleCreatorVotesUpdated);
+};
+
 export const connectSocket = (token) => {
   if (!token) {
     return null;
   }
 
   if (socket) {
-    socket.off('connect', emitFieldSubscriptions);
+    detachSocketListeners(socket);
     socket.disconnect();
   }
 
   socket = io(SOCKET_URL, {
-    auth: { token },
-    transports: ['websocket']
+    auth: { token }
   });
-  socket.on('connect', emitFieldSubscriptions);
+  setSocketConnected(socket.connected);
+  attachSocketListeners(socket);
 
   return socket;
 };
 
 export const disconnectSocket = () => {
   if (socket) {
-    socket.off('connect', emitFieldSubscriptions);
+    detachSocketListeners(socket);
     socket.disconnect();
     socket = null;
   }
 
+  setSocketConnected(false);
   subscribedFieldIds = [];
 };
 
@@ -64,46 +131,22 @@ export const subscribeToFieldRooms = (fieldIds) => {
 };
 
 export const onPollUpdated = (handler) => {
-  if (!socket) {
-    return () => {};
-  }
-
-  socket.on('poll:updated', handler);
-  return () => socket.off('poll:updated', handler);
+  pollUpdatedListeners.add(handler);
+  return () => pollUpdatedListeners.delete(handler);
 };
 
 export const onAdminResultsUpdated = (handler) => {
-  if (!socket) {
-    return () => {};
-  }
-
-  socket.on('admin:resultsUpdated', handler);
-  return () => socket.off('admin:resultsUpdated', handler);
+  adminResultsUpdatedListeners.add(handler);
+  return () => adminResultsUpdatedListeners.delete(handler);
 };
 
 export const onCreatorVotesUpdated = (handler) => {
-  if (!socket) {
-    return () => {};
-  }
-
-  socket.on('creator:votesUpdated', handler);
-  return () => socket.off('creator:votesUpdated', handler);
+  creatorVotesUpdatedListeners.add(handler);
+  return () => creatorVotesUpdatedListeners.delete(handler);
 };
 
 export const onSocketStateChanged = (handler) => {
-  if (!socket) {
-    return () => {};
-  }
-
-  const onConnect = () => handler(true);
-  const onDisconnect = () => handler(false);
-
-  socket.on('connect', onConnect);
-  socket.on('disconnect', onDisconnect);
-  handler(socket.connected);
-
-  return () => {
-    socket.off('connect', onConnect);
-    socket.off('disconnect', onDisconnect);
-  };
+  socketStateListeners.add(handler);
+  handler(socketConnected);
+  return () => socketStateListeners.delete(handler);
 };

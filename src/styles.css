@@ -13,6 +13,9 @@
   --border-soft: rgba(18, 55, 91, 0.1);
   --text-muted: #4f6478;
   --shadow-soft: 0 20px 45px rgba(13, 79, 136, 0.12);
+  --content-width: 1040px;
+  --nominee-photo-size: 104px;
+  --nominee-card-min-height: 146px;
   background:
     radial-gradient(circle at top left, rgba(15, 127, 201, 0.18), transparent 34%),
     radial-gradient(circle at top right, rgba(240, 190, 63, 0.2), transparent 28%),
@@ -128,7 +131,7 @@ input {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
-  width: min(100%, 960px);
+  width: min(100%, var(--content-width));
   margin: 0 auto;
   justify-content: center;
 }
@@ -156,7 +159,7 @@ input {
 .stack {
   display: grid;
   gap: 18px;
-  width: min(100%, 960px);
+  width: min(100%, var(--content-width));
   margin: 0 auto;
 }
 
@@ -225,6 +228,7 @@ input {
 .auth-logo {
   display: block;
   object-fit: contain;
+  border-radius: 18px;
 }
 
 .brand-logo {
@@ -403,21 +407,21 @@ input {
 .option-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  gap: 16px;
 }
 
 .option-button {
   border-radius: 18px;
-  padding: 16px;
+  padding: 18px;
   background: var(--surface-strong);
   border: 1px solid rgba(15, 127, 201, 0.12);
   display: flex;
   justify-content: space-between;
-  gap: 16px;
+  gap: 18px;
   align-items: center;
   text-align: left;
   color: inherit;
-  min-height: 108px;
+  min-height: var(--nominee-card-min-height);
 }
 
 .option-button.selected {
@@ -427,16 +431,16 @@ input {
 }
 
 .option-media {
-  flex: 0 0 72px;
+  flex: 0 0 var(--nominee-photo-size);
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .nominee-photo {
-  width: 72px;
-  height: 72px;
-  border-radius: 20px;
+  width: var(--nominee-photo-size);
+  height: var(--nominee-photo-size);
+  border-radius: 24px;
   object-fit: cover;
   box-shadow: 0 12px 22px rgba(15, 127, 201, 0.16);
   border: 1px solid rgba(15, 127, 201, 0.12);
@@ -462,6 +466,8 @@ input {
 .option-name {
   font-weight: 700;
   color: var(--brand-blue-deep);
+  font-size: 1.08rem;
+  line-height: 1.35;
 }
 
 .option-hint {
@@ -564,7 +570,7 @@ input {
 }
 
 .system-banner {
-  width: min(100%, 960px);
+  width: min(100%, var(--content-width));
   margin: 0 auto;
   padding: 14px 18px;
   border-radius: 18px;
@@ -592,6 +598,12 @@ input {
 }
 
 @media (max-width: 1024px) {
+  :root {
+    --content-width: 980px;
+    --nominee-photo-size: 98px;
+    --nominee-card-min-height: 138px;
+  }
+
   .topbar {
     align-items: flex-start;
   }
@@ -602,6 +614,11 @@ input {
 }
 
 @media (max-width: 768px) {
+  :root {
+    --nominee-photo-size: 92px;
+    --nominee-card-min-height: 132px;
+  }
+
   .app-shell {
     padding: 16px 14px 32px;
   }
@@ -643,6 +660,11 @@ input {
     grid-template-columns: 1fr;
   }
 
+  .option-button {
+    padding: 18px 20px;
+    align-items: flex-start;
+  }
+
   .count-row {
     grid-template-columns: 1fr;
     gap: 6px;
@@ -678,6 +700,11 @@ input {
 }
 
 @media (max-width: 560px) {
+  :root {
+    --nominee-photo-size: 92px;
+    --nominee-card-min-height: 0;
+  }
+
   .topbar {
     padding: 18px 16px;
   }
@@ -719,16 +746,21 @@ input {
   }
 
   .option-button {
-    min-height: 0;
     align-items: flex-start;
   }
+}
 
-  .option-media {
-    flex-basis: 64px;
+@media (max-width: 420px) {
+  :root {
+    --nominee-photo-size: 84px;
   }
 
-  .nominee-photo {
-    width: 64px;
-    height: 64px;
+  .option-button {
+    padding: 16px;
+    gap: 14px;
+  }
+
+  .option-name {
+    font-size: 1rem;
   }
 }

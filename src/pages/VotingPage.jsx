@@ -199,10 +199,11 @@ const VotingPage = () => {
   }, []);
 
   const handleVote = useCallback(async (fieldId, option) => {
-    if (votesByFieldRef.current[fieldId] || inFlightVotesRef.current.has(fieldId)) {
+    if (inFlightVotesRef.current.has(fieldId)) {
       return;
     }
 
+    const hadExistingVote = Boolean(votesByFieldRef.current[fieldId]);
     inFlightVotesRef.current.add(fieldId);
     setSubmittingFieldId(fieldId);
     setError('');
@@ -231,7 +232,9 @@ const VotingPage = () => {
             : field
         )
       );
-      setCurrentFieldIndex((current) => Math.min(current + 1, fields.length - 1));
+      if (!hadExistingVote) {
+        setCurrentFieldIndex((current) => Math.min(current + 1, fields.length - 1));
+      }
     } catch (requestError) {
       if (requestError.response?.status === 409) {
         await loadVotingData({ showLoader: false });
@@ -340,6 +343,7 @@ const VotingPage = () => {
           selectedOption={votesByField[currentField.id]}
           submitting={submittingFieldId === currentField.id}
           totalFields={fields.length}
+          votingLocked={allCategoriesCompleted}
         />
       </div>
     </section>

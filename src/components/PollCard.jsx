@@ -31,6 +31,7 @@ const PollCard = ({
   field,
   selectedOption,
   submitting,
+  votingLocked,
   onVote,
   currentIndex,
   totalFields,
@@ -54,7 +55,13 @@ const PollCard = ({
         <strong>
           Category {currentIndex + 1} of {totalFields}
         </strong>
-        <span>{hasVoted ? 'Vote recorded for this category.' : 'Select one nominee to cast your vote.'}</span>
+        <span>
+          {votingLocked
+            ? 'Voting is complete. Your selections are now locked.'
+            : hasVoted
+              ? 'You can still change this selection until all categories are completed.'
+              : 'Select one nominee to cast your vote.'}
+        </span>
       </div>
 
       <div className="option-grid">
@@ -65,7 +72,7 @@ const PollCard = ({
             <button
               key={option}
               className={`option-button ${isSelected ? 'selected' : ''}`}
-              disabled={hasVoted || submitting}
+              disabled={votingLocked || submitting}
               onClick={() => onVote(field.id, option)}
               type="button"
             >
@@ -75,10 +82,14 @@ const PollCard = ({
               <div className="option-copy">
                 <span className="option-name">{option}</span>
                 <span className="option-hint">
-                  {hasVoted ? 'Selection locked for this category.' : 'Tap to cast your vote.'}
+                  {votingLocked
+                    ? 'Selection locked.'
+                    : isSelected
+                      ? 'Current selection. Tap another nominee to change it.'
+                      : 'Tap to cast or update your vote.'}
                 </span>
               </div>
-              {isSelected ? <strong className="option-state">Your vote</strong> : null}
+              {isSelected ? <strong className="option-state">Selected</strong> : null}
             </button>
           );
         })}

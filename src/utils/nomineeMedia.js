@@ -1,5 +1,18 @@
 const explicitNomineePhotoMap = {
-  'cno ojo oye yemi': '/nominees/CNO_Ojo_Oyeyemi.jpeg'
+  'adns balogun a': '/nominees/ADNS_Balogun_A.jpeg',
+  'adns adeyiolu': '/nominees/ADNS_Adeyiolu.jpg',
+  'adns jetawo': '/nominees/ADNS_Jetawo.jpeg',
+  'adns salami': '/nominees/ADNS_Salami.jpeg',
+  'cno adetunji': '/nominees/CNO_Adetunji.jpeg',
+  'cno ismail': '/nominees/CNO_Ismail.jpeg',
+  'cno ojo oye yemi': '/nominees/CNO_Ojo_Oyeyemi.jpeg',
+  'cno olorunnimbe': '/nominees/CNO_Olorunnimbe.jpeg',
+  'cno oyefeso': '/nominees/CNO_Oyefeso.jpeg',
+  'no i pelemo': '/nominees/NO_II_Pelemo.jpeg',
+  'no ii ajisafe': '/nominees/NO_II_Ajisafe.jpeg',
+  'no ii emode': '/nominees/NO_II_Emode.jpeg',
+  'sno abeeb': '/nominees/SNO_Abeeb.jpeg',
+  'sno akintola': '/nominees/SNO_Akintola.jpeg'
 };
 
 const normalizeNomineeName = (name) =>

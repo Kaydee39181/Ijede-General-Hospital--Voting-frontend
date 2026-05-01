@@ -184,6 +184,10 @@ const VotingPage = () => {
     writeVotingProgress(user.id, currentFieldIndex);
   }, [currentFieldIndex, fields.length, user?.id]);
 
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  }, [currentFieldIndex]);
+
   const clearAutoLogoutCountdown = useCallback(() => {
     if (autoLogoutTimeoutRef.current) {
       window.clearTimeout(autoLogoutTimeoutRef.current);

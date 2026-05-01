@@ -11,12 +11,55 @@ import { connectSocket, disconnectSocket, onSocketStateChanged } from '../servic
 
 const AuthContext = createContext(null);
 const BACKEND_RECOVERY_WINDOW_MS = 60000;
+const AUTH_STORAGE_KEY = 'realtime-voting-auth';
+
+const readStoredAuth = () => {
+  if (typeof window === 'undefined') {
+    return { token: null, user: null };
+  }
+
+  const storedValue = window.localStorage.getItem(AUTH_STORAGE_KEY);
+
+  if (!storedValue) {
+    return { token: null, user: null };
+  }
+
+  try {
+    const parsed = JSON.parse(storedValue);
+
+    if (typeof parsed?.token !== 'string' || !parsed.token || !parsed?.user) {
+      window.localStorage.removeItem(AUTH_STORAGE_KEY);
+      return { token: null, user: null };
+    }
+
+    return {
+      token: parsed.token,
+      user: parsed.user
+    };
+  } catch (error) {
+    window.localStorage.removeItem(AUTH_STORAGE_KEY);
+    return { token: null, user: null };
+  }
+};
+
+const writeStoredAuth = (authState) => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  if (!authState?.token || !authState?.user) {
+    window.localStorage.removeItem(AUTH_STORAGE_KEY);
+    return;
+  }
+
+  window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(authState));
+};
 
 const buildDeviceConflictError = (activeUser) =>
   new Error(`This device is already signed in as ${activeUser}. Log out there first.`);
 
 export const AuthProvider = ({ children }) => {
-  const [authState, setAuthState] = useState({ token: null, user: null });
+  const [authState, setAuthState] = useState(readStoredAuth);
   const [authLoading, setAuthLoading] = useState(false);
   const [authNotice, setAuthNotice] = useState('');
   const [backendOutage, setBackendOutage] = useState(null);
@@ -26,11 +69,28 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     if (authState.token) {
       setAuthToken(authState.token);
+      connectSocket(authState.token);
       return;
     }
 
     setAuthToken(null);
     disconnectSocket();
+  }, [authState.token]);
+
+  useEffect(() => {
+    if (!authState.token || !authState.user?.name) {
+      return;
+    }
+
+    const lockResult = claimDeviceLock(authState.user.name);
+
+    if (!lockResult.ok) {
+      performLogout(`This device is already signed in as ${lockResult.activeUser}. Log out there first.`);
+    }
+  }, [authState.token, authState.user?.name]);
+
+  useEffect(() => {
+    writeStoredAuth(authState);
   }, [authState]);
 
   const clearBackendOutage = () => {
@@ -128,7 +188,6 @@ export const AuthProvider = ({ children }) => {
       throw buildDeviceConflictError(lockResult.activeUser);
     }
 
-    connectSocket(payload.token);
     setAuthNotice('');
     setAuthState({
       token: payload.token,

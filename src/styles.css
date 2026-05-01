@@ -14,8 +14,9 @@
   --text-muted: #4f6478;
   --shadow-soft: 0 20px 45px rgba(13, 79, 136, 0.12);
   --content-width: 1040px;
-  --nominee-photo-size: 104px;
-  --nominee-card-min-height: 146px;
+  --nominee-photo-size: 484px;
+  --nominee-photo-height: 484px;
+  --nominee-card-min-height: 0;
   background:
     radial-gradient(circle at top left, rgba(15, 127, 201, 0.18), transparent 34%),
     radial-gradient(circle at top right, rgba(240, 190, 63, 0.2), transparent 28%),
@@ -407,41 +408,54 @@ input {
 .option-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
+  gap: 20px;
 }
 
 .option-button {
+  width: 100%;
   border-radius: 18px;
   padding: 18px;
   background: var(--surface-strong);
   border: 1px solid rgba(15, 127, 201, 0.12);
-  display: flex;
-  justify-content: space-between;
-  gap: 18px;
-  align-items: center;
+  display: grid;
+  grid-template-rows: var(--nominee-photo-height) auto auto;
+  gap: 16px;
+  align-items: start;
   text-align: left;
   color: inherit;
   min-height: var(--nominee-card-min-height);
+  box-shadow: 0 18px 34px rgba(13, 79, 136, 0.08);
+  overflow: hidden;
 }
 
 .option-button.selected {
   background: linear-gradient(135deg, rgba(15, 127, 201, 0.14), rgba(15, 143, 135, 0.12));
   color: var(--brand-blue-deep);
   border-color: rgba(15, 127, 201, 0.28);
+  box-shadow: 0 22px 42px rgba(13, 79, 136, 0.16);
 }
 
 .option-media {
-  flex: 0 0 var(--nominee-photo-size);
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 100%;
+  height: var(--nominee-photo-height);
+  min-height: var(--nominee-photo-height);
+  padding: 10px;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(15, 127, 201, 0.08);
+  overflow: hidden;
 }
 
 .nominee-photo {
-  width: var(--nominee-photo-size);
-  height: var(--nominee-photo-size);
-  border-radius: 24px;
+  width: 100%;
+  height: 100%;
+  display: block;
+  border-radius: 18px;
   object-fit: cover;
+  object-position: center top;
   box-shadow: 0 12px 22px rgba(15, 127, 201, 0.16);
   border: 1px solid rgba(15, 127, 201, 0.12);
   background: rgba(255, 255, 255, 0.95);
@@ -458,27 +472,35 @@ input {
 
 .option-copy {
   display: grid;
-  gap: 6px;
-  flex: 1 1 auto;
+  gap: 8px;
   min-width: 0;
+  align-content: start;
+  text-align: center;
+  padding: 0 8px;
 }
 
 .option-name {
   font-weight: 700;
   color: var(--brand-blue-deep);
-  font-size: 1.08rem;
-  line-height: 1.35;
+  font-size: clamp(1.08rem, 1rem + 0.4vw, 1.32rem);
+  line-height: 1.3;
+  text-wrap: balance;
 }
 
 .option-hint {
   color: var(--text-muted);
-  font-size: 0.92rem;
+  font-size: 0.9rem;
   line-height: 1.4;
 }
 
 .option-state {
-  flex: 0 0 auto;
+  justify-self: center;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgba(15, 127, 201, 0.1);
   color: var(--brand-blue-deep);
+  font-size: 0.9rem;
+  line-height: 1;
 }
 
 .count-list {
@@ -600,8 +622,8 @@ input {
 @media (max-width: 1024px) {
   :root {
     --content-width: 980px;
-    --nominee-photo-size: 98px;
-    --nominee-card-min-height: 138px;
+    --nominee-photo-size: 420px;
+    --nominee-photo-height: 420px;
   }
 
   .topbar {
@@ -613,10 +635,26 @@ input {
   }
 }
 
+@media (max-width: 900px) {
+  :root {
+    --nominee-photo-size: 460px;
+    --nominee-photo-height: 460px;
+  }
+
+  .option-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .option-button {
+    max-width: 680px;
+    margin-inline: auto;
+  }
+}
+
 @media (max-width: 768px) {
   :root {
-    --nominee-photo-size: 92px;
-    --nominee-card-min-height: 132px;
+    --nominee-photo-size: 400px;
+    --nominee-photo-height: 400px;
   }
 
   .app-shell {
@@ -656,13 +694,8 @@ input {
     text-align: center;
   }
 
-  .option-grid {
-    grid-template-columns: 1fr;
-  }
-
   .option-button {
     padding: 18px 20px;
-    align-items: flex-start;
   }
 
   .count-row {
@@ -701,8 +734,8 @@ input {
 
 @media (max-width: 560px) {
   :root {
-    --nominee-photo-size: 92px;
-    --nominee-card-min-height: 0;
+    --nominee-photo-size: 320px;
+    --nominee-photo-height: 320px;
   }
 
   .topbar {
@@ -745,14 +778,12 @@ input {
     text-align: center;
   }
 
-  .option-button {
-    align-items: flex-start;
-  }
 }
 
 @media (max-width: 420px) {
   :root {
-    --nominee-photo-size: 84px;
+    --nominee-photo-size: 260px;
+    --nominee-photo-height: 260px;
   }
 
   .option-button {
@@ -762,5 +793,9 @@ input {
 
   .option-name {
     font-size: 1rem;
+  }
+
+  .option-hint {
+    font-size: 0.85rem;
   }
 }

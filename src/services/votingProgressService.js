@@ -22,3 +22,11 @@ export const writeVotingProgress = (userId, fieldIndex) => {
 
   localStorage.setItem(getProgressStorageKey(userId), String(fieldIndex));
 };
+
+export const clearVotingProgress = (userId) => {
+  if (!userId) {
+    return;
+  }
+
+  localStorage.removeItem(getProgressStorageKey(userId));
+};

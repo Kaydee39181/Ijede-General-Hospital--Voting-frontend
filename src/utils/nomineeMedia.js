@@ -7,11 +7,15 @@ const explicitNomineePhotoMap = {
   'cno ismail': '/nominees/CNO_Ismail.jpeg',
   'cno ojo oye yemi': '/nominees/CNO_Ojo_Oyeyemi.jpeg',
   'cno olorunnimbe': '/nominees/CNO_Olorunnimbe.jpeg',
+  'cno otayomi': '/nominees/CNO_Otayomi.jpg',
   'cno oyefeso': '/nominees/CNO_Oyefeso.jpeg',
   'no i pelemo': '/nominees/NO_II_Pelemo.jpg',
   'no ii pelemo': '/nominees/NO_II_Pelemo.jpg',
   'no ii ajisafe': '/nominees/NO_II_Ajisafe.jpeg',
   'no ii emode': '/nominees/NO_II_Emode.jpeg',
+  'sn adegboye': '/nominees/SN_Adegboye.jpg',
+  'sn hassan': '/nominees/SN_Hassan_A.jpg',
+  'sno adeleke': '/nominees/SNO_Adeleke.jpg',
   'sno abeeb': '/nominees/SNO_Abeeb.jpeg',
   'sno akintola': '/nominees/SNO_Akintola.jpeg'
 };

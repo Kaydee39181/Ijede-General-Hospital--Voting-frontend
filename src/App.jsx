@@ -6,6 +6,7 @@ import AdminDashboardPage from './pages/AdminDashboardPage';
 import CreatorDashboardPage from './pages/CreatorDashboardPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
+import VoteSubmittedPage from './pages/VoteSubmittedPage';
 import VotingPage from './pages/VotingPage';
 
 const getHomeRoute = (user) => {
@@ -51,6 +52,7 @@ const App = () => (
 
       <Route element={<ProtectedRoute allowedRoles={['user']} />}>
         <Route path="/vote" element={<VotingPage />} />
+        <Route path="/vote/submitted" element={<VoteSubmittedPage />} />
       </Route>
 
       <Route element={<ProtectedRoute allowedRoles={['admin']} />}>

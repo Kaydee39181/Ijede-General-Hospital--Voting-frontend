@@ -36,7 +36,10 @@ const PollCard = ({
   currentIndex,
   totalFields,
   onPrevious,
-  onNext
+  onNext,
+  onSubmitBallot,
+  canSubmitBallot,
+  submitBallotPending
 }) => {
   const hasVoted = Boolean(selectedOption);
   const isFirstField = currentIndex === 0;
@@ -59,7 +62,7 @@ const PollCard = ({
           {votingLocked
             ? 'Voting is complete. Your selections are now locked.'
             : hasVoted
-              ? 'You can still change this selection until all categories are completed.'
+              ? 'You can still change this selection until you submit your ballot.'
               : 'Select one nominee to cast your vote.'}
         </span>
       </div>
@@ -99,9 +102,20 @@ const PollCard = ({
         <button className="ghost-button" disabled={isFirstField} onClick={onPrevious} type="button">
           Previous
         </button>
-        <button className="primary-button" disabled={isLastField} onClick={onNext} type="button">
-          Next
-        </button>
+        {isLastField ? (
+          <button
+            className="primary-button"
+            disabled={!canSubmitBallot || submitBallotPending}
+            onClick={onSubmitBallot}
+            type="button"
+          >
+            {submitBallotPending ? 'Submitting...' : 'Submit Votes'}
+          </button>
+        ) : (
+          <button className="primary-button" onClick={onNext} type="button">
+            Next
+          </button>
+        )}
       </div>
     </article>
   );
@@ -116,6 +130,9 @@ export default memo(PollCard, (previousProps, nextProps) => {
     previousProps.currentIndex === nextProps.currentIndex &&
     previousProps.totalFields === nextProps.totalFields &&
     previousProps.onPrevious === nextProps.onPrevious &&
-    previousProps.onNext === nextProps.onNext
+    previousProps.onNext === nextProps.onNext &&
+    previousProps.onSubmitBallot === nextProps.onSubmitBallot &&
+    previousProps.canSubmitBallot === nextProps.canSubmitBallot &&
+    previousProps.submitBallotPending === nextProps.submitBallotPending
   );
 });

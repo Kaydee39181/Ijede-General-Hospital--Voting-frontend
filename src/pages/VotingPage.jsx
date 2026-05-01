@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Navigate } from 'react-router-dom';
 import ErrorState from '../components/ErrorState';
 import LoadingState from '../components/LoadingState';
 import PollCard from '../components/PollCard';
@@ -9,8 +10,12 @@ import {
   onSocketStateChanged,
   subscribeToFieldRooms
 } from '../services/socketService';
-import { createVote, fetchMyVotes } from '../services/voteService';
-import { readVotingProgress, writeVotingProgress } from '../services/votingProgressService';
+import { createVote, fetchMyVotes, submitVote } from '../services/voteService';
+import {
+  clearVotingProgress,
+  readVotingProgress,
+  writeVotingProgress
+} from '../services/votingProgressService';
 
 const getVersionValue = (entity, fallbackValue = 0) => {
   if (typeof entity?.revision === 'number') {
@@ -20,8 +25,6 @@ const getVersionValue = (entity, fallbackValue = 0) => {
   const timestamp = entity?.updatedAt ? new Date(entity.updatedAt).getTime() : 0;
   return timestamp || fallbackValue;
 };
-
-const AUTO_LOGOUT_AFTER_COMPLETION_MS = 40000;
 
 const resolveResumeIndex = (fieldData, voteMap, storedIndex) => {
   if (!fieldData.length) {
@@ -47,21 +50,21 @@ const resolveResumeIndex = (fieldData, voteMap, storedIndex) => {
 };
 
 const VotingPage = () => {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const [fields, setFields] = useState([]);
   const [votesByField, setVotesByField] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [submittingFieldId, setSubmittingFieldId] = useState('');
+  const [submittingBallot, setSubmittingBallot] = useState(false);
   const [currentFieldIndex, setCurrentFieldIndex] = useState(0);
-  const [autoLogoutRemainingMs, setAutoLogoutRemainingMs] = useState(null);
+  const [showSubmitPrompt, setShowSubmitPrompt] = useState(false);
+  const [hasSubmittedBallot, setHasSubmittedBallot] = useState(false);
   const inFlightVotesRef = useRef(new Set());
   const votesByFieldRef = useRef({});
   const fieldVersionRef = useRef({});
   const hasSeenSocketStateRef = useRef(false);
   const lastSocketConnectedRef = useRef(false);
-  const autoLogoutTimeoutRef = useRef(null);
-  const autoLogoutIntervalRef = useRef(null);
 
   useEffect(() => {
     votesByFieldRef.current = votesByField;
@@ -96,7 +99,7 @@ const VotingPage = () => {
 
     try {
       const [fieldData, voteData] = await Promise.all([fetchFields(), fetchMyVotes()]);
-      const voteMap = voteData.reduce((accumulator, vote) => {
+      const voteMap = voteData.votes.reduce((accumulator, vote) => {
         accumulator[vote.fieldId] = vote.option;
         return accumulator;
       }, {});
@@ -105,6 +108,7 @@ const VotingPage = () => {
 
       mergeFieldData(fieldData, requestStartedAt);
       setVotesByField(voteMap);
+      setHasSubmittedBallot(Boolean(voteData.hasSubmittedBallot));
       votesByFieldRef.current = voteMap;
       setCurrentFieldIndex(nextIndex);
       subscribeToFieldRooms(fieldData.map((field) => field.id));
@@ -177,111 +181,101 @@ const VotingPage = () => {
   }, [fields]);
 
   useEffect(() => {
-    if (!user?.id || !fields.length) {
+    if (!user?.id || !fields.length || hasSubmittedBallot) {
       return;
     }
 
     writeVotingProgress(user.id, currentFieldIndex);
-  }, [currentFieldIndex, fields.length, user?.id]);
+  }, [currentFieldIndex, fields.length, hasSubmittedBallot, user?.id]);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'auto' });
   }, [currentFieldIndex]);
 
-  const clearAutoLogoutCountdown = useCallback(() => {
-    if (autoLogoutTimeoutRef.current) {
-      window.clearTimeout(autoLogoutTimeoutRef.current);
-      autoLogoutTimeoutRef.current = null;
-    }
-
-    if (autoLogoutIntervalRef.current) {
-      window.clearInterval(autoLogoutIntervalRef.current);
-      autoLogoutIntervalRef.current = null;
-    }
-
-    setAutoLogoutRemainingMs(null);
-  }, []);
-
-  const handleVote = useCallback(async (fieldId, option) => {
-    if (inFlightVotesRef.current.has(fieldId)) {
-      return;
-    }
-
-    const hadExistingVote = Boolean(votesByFieldRef.current[fieldId]);
-    inFlightVotesRef.current.add(fieldId);
-    setSubmittingFieldId(fieldId);
-    setError('');
-
-    try {
-      const response = await createVote({ fieldId, option });
-
-      setVotesByField((current) => ({
-        ...current,
-        [fieldId]: response.vote.option
-      }));
-      votesByFieldRef.current = {
-        ...votesByFieldRef.current,
-        [fieldId]: response.vote.option
-      };
-      fieldVersionRef.current[fieldId] = getVersionValue(response, Date.now());
-
-      setFields((current) =>
-        current.map((field) =>
-          field.id === fieldId
-            ? {
-                ...field,
-                revision: response.revision ?? field.revision,
-                updatedAt: response.updatedAt ?? field.updatedAt
-              }
-            : field
-        )
-      );
-      if (!hadExistingVote) {
-        setCurrentFieldIndex((current) => Math.min(current + 1, fields.length - 1));
+  const handleVote = useCallback(
+    async (fieldId, option) => {
+      if (hasSubmittedBallot || submittingBallot || inFlightVotesRef.current.has(fieldId)) {
+        return;
       }
-    } catch (requestError) {
-      if (requestError.response?.status === 409) {
-        await loadVotingData({ showLoader: false });
-      } else {
-        setError(requestError.response?.data?.message || 'Unable to save your vote.');
+
+      const hadExistingVote = Boolean(votesByFieldRef.current[fieldId]);
+      inFlightVotesRef.current.add(fieldId);
+      setSubmittingFieldId(fieldId);
+      setError('');
+
+      try {
+        const response = await createVote({ fieldId, option });
+
+        setVotesByField((current) => ({
+          ...current,
+          [fieldId]: response.vote.option
+        }));
+        votesByFieldRef.current = {
+          ...votesByFieldRef.current,
+          [fieldId]: response.vote.option
+        };
+        fieldVersionRef.current[fieldId] = getVersionValue(response, Date.now());
+
+        setFields((current) =>
+          current.map((field) =>
+            field.id === fieldId
+              ? {
+                  ...field,
+                  revision: response.revision ?? field.revision,
+                  updatedAt: response.updatedAt ?? field.updatedAt
+                }
+              : field
+          )
+        );
+
+        if (!hadExistingVote) {
+          setCurrentFieldIndex((current) => Math.min(current + 1, fields.length - 1));
+        }
+      } catch (requestError) {
+        if (requestError.response?.status === 409) {
+          await loadVotingData({ showLoader: false });
+        } else {
+          setError(requestError.response?.data?.message || 'Unable to save your vote.');
+        }
+      } finally {
+        inFlightVotesRef.current.delete(fieldId);
+        setSubmittingFieldId('');
       }
-    } finally {
-      inFlightVotesRef.current.delete(fieldId);
-      setSubmittingFieldId('');
-    }
-  }, [fields.length, loadVotingData]);
+    },
+    [fields.length, hasSubmittedBallot, loadVotingData, submittingBallot]
+  );
 
   const completedCount = fields.filter((field) => votesByField[field.id]).length;
   const allCategoriesCompleted = fields.length > 0 && completedCount === fields.length;
 
-  useEffect(() => {
-    if (user?.role !== 'user' || !allCategoriesCompleted) {
-      clearAutoLogoutCountdown();
-      return undefined;
+  const handleSubmitBallot = useCallback(async () => {
+    if (!allCategoriesCompleted || submittingBallot) {
+      return;
     }
 
-    if (autoLogoutTimeoutRef.current || autoLogoutIntervalRef.current) {
-      return undefined;
+    setSubmittingBallot(true);
+    setError('');
+
+    try {
+      await submitVote();
+      clearVotingProgress(user?.id);
+      setHasSubmittedBallot(true);
+      setShowSubmitPrompt(false);
+    } catch (requestError) {
+      setShowSubmitPrompt(false);
+      if (requestError.response?.status === 409) {
+        await loadVotingData({ showLoader: false });
+      } else {
+        setError(requestError.response?.data?.message || 'Unable to submit your ballot.');
+      }
+    } finally {
+      setSubmittingBallot(false);
     }
+  }, [allCategoriesCompleted, loadVotingData, submittingBallot, user?.id]);
 
-    const deadline = Date.now() + AUTO_LOGOUT_AFTER_COMPLETION_MS;
-
-    setAutoLogoutRemainingMs(AUTO_LOGOUT_AFTER_COMPLETION_MS);
-
-    autoLogoutIntervalRef.current = window.setInterval(() => {
-      setAutoLogoutRemainingMs(Math.max(0, deadline - Date.now()));
-    }, 1000);
-
-    autoLogoutTimeoutRef.current = window.setTimeout(() => {
-      logout('Voting complete. You were signed out automatically after 40 seconds.');
-    }, AUTO_LOGOUT_AFTER_COMPLETION_MS);
-
-    return () => {
-      clearAutoLogoutCountdown();
-    };
-  }, [allCategoriesCompleted, clearAutoLogoutCountdown, logout, user?.role]);
-
-  useEffect(() => () => clearAutoLogoutCountdown(), [clearAutoLogoutCountdown]);
+  if (hasSubmittedBallot) {
+    return <Navigate to="/vote/submitted" replace />;
+  }
 
   if (loading) {
     return <LoadingState message="Loading polls and your voting history..." />;
@@ -303,9 +297,6 @@ const VotingPage = () => {
   }
 
   const currentField = fields[currentFieldIndex];
-  const autoLogoutSeconds = autoLogoutRemainingMs
-    ? Math.max(1, Math.ceil(autoLogoutRemainingMs / 1000))
-    : 0;
 
   return (
     <section className="page-grid">
@@ -326,11 +317,8 @@ const VotingPage = () => {
         </div>
         {allCategoriesCompleted ? (
           <div className="system-banner success-banner" role="status">
-            <strong>Voting complete.</strong>
-            <span>
-              You will be logged out automatically in {autoLogoutSeconds} second
-              {autoLogoutSeconds === 1 ? '' : 's'}.
-            </span>
+            <strong>All categories have been completed.</strong>
+            <span>Review your choices and press Submit Votes on the last page when you are ready.</span>
           </div>
         ) : null}
         {error ? <p className="error-text">{error}</p> : null}
@@ -338,18 +326,56 @@ const VotingPage = () => {
 
       <div className="stack">
         <PollCard
+          canSubmitBallot={allCategoriesCompleted}
           currentIndex={currentFieldIndex}
           field={currentField}
           key={currentField.id}
           onNext={() => setCurrentFieldIndex((current) => Math.min(current + 1, fields.length - 1))}
           onPrevious={() => setCurrentFieldIndex((current) => Math.max(current - 1, 0))}
+          onSubmitBallot={() => setShowSubmitPrompt(true)}
           onVote={handleVote}
           selectedOption={votesByField[currentField.id]}
+          submitBallotPending={submittingBallot}
           submitting={submittingFieldId === currentField.id}
           totalFields={fields.length}
-          votingLocked={allCategoriesCompleted}
+          votingLocked={false}
         />
       </div>
+
+      {showSubmitPrompt ? (
+        <div className="confirmation-overlay" role="presentation">
+          <div
+            aria-labelledby="submit-ballot-title"
+            aria-modal="true"
+            className="confirmation-dialog panel"
+            role="dialog"
+          >
+            <p className="eyebrow">Confirm Submission</p>
+            <h3 id="submit-ballot-title">Are you sure you want to submit your votes?</h3>
+            <p className="muted-text">
+              Once you confirm, your ballot will be counted and you will not be able to make
+              further changes.
+            </p>
+            <div className="confirmation-actions">
+              <button
+                className="ghost-button"
+                onClick={() => setShowSubmitPrompt(false)}
+                type="button"
+              >
+                No
+              </button>
+              <button
+                className="primary-button"
+                disabled={submittingBallot}
+                onClick={handleSubmitBallot}
+                type="button"
+              >
+                {submittingBallot ? 'Submitting...' : 'Yes'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 };

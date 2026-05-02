@@ -100,7 +100,7 @@ const CreatorDashboardPage = () => {
   }
 
   return (
-    <section className="page-grid">
+    <section className="page-grid creator-audit-page">
       <div className="panel hero-panel">
         <p className="eyebrow">Creator Dashboard</p>
         <h2>General Hospital Ijede vote audit</h2>
@@ -113,24 +113,24 @@ const CreatorDashboardPage = () => {
 
       <div className="panel table-panel">
         <div className="table-header">
-          <span>User</span>
-          <span>Poll</span>
-          <span>Selected Option</span>
-          <span>Time</span>
+          <span className="table-column-user">User</span>
+          <span className="table-column-poll">Poll</span>
+          <span className="table-column-option">Selected Option</span>
+          <span className="table-column-time">Time</span>
         </div>
 
         {votes.map((vote) => (
           <div className="table-row" key={vote.id}>
-            <span className="table-cell" data-label="User">
+            <span className="table-cell table-cell-user" data-label="User">
               {vote.userName}
             </span>
-            <span className="table-cell" data-label="Poll">
+            <span className="table-cell table-cell-poll" data-label="Poll">
               {vote.pollTitle}
             </span>
-            <strong className="table-cell" data-label="Selected Option">
+            <strong className="table-cell table-cell-option" data-label="Selected Option">
               {vote.option}
             </strong>
-            <span className="table-cell" data-label="Time">
+            <span className="table-cell table-cell-time" data-label="Time">
               {formatDateTime(vote.createdAt)}
             </span>
           </div>

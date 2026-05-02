@@ -604,6 +604,31 @@ input {
   color: var(--brand-blue-deep);
 }
 
+.creator-audit-page {
+  width: min(100%, 1140px);
+}
+
+.creator-audit-page .table-panel {
+  width: 100%;
+}
+
+.creator-audit-page .table-header,
+.creator-audit-page .table-row {
+  grid-template-columns: minmax(220px, 1.45fr) minmax(280px, 1.85fr) minmax(190px, 1.2fr) minmax(165px, 0.95fr);
+  gap: 16px;
+}
+
+.creator-audit-page .table-cell-user,
+.creator-audit-page .table-cell-poll,
+.creator-audit-page .table-cell-option {
+  overflow-wrap: anywhere;
+}
+
+.creator-audit-page .table-column-time,
+.creator-audit-page .table-cell-time {
+  white-space: nowrap;
+}
+
 .error-text {
   margin: 0;
   color: var(--brand-red);

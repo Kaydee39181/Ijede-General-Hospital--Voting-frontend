@@ -3,6 +3,7 @@ import { Navigate } from 'react-router-dom';
 import ErrorState from '../components/ErrorState';
 import LoadingState from '../components/LoadingState';
 import PollCard from '../components/PollCard';
+import VotingClosedPanel from '../components/VotingClosedPanel';
 import { useAuth } from '../context/AuthContext';
 import { fetchFields } from '../services/fieldService';
 import {
@@ -16,6 +17,11 @@ import {
   readVotingProgress,
   writeVotingProgress
 } from '../services/votingProgressService';
+import {
+  formatVotingCountdown,
+  getVotingClosesAt,
+  isVotingClosedAt
+} from '../utils/votingWindow';
 
 const getVersionValue = (entity, fallbackValue = 0) => {
   if (typeof entity?.revision === 'number') {
@@ -60,6 +66,9 @@ const VotingPage = () => {
   const [currentFieldIndex, setCurrentFieldIndex] = useState(0);
   const [showSubmitPrompt, setShowSubmitPrompt] = useState(false);
   const [hasSubmittedBallot, setHasSubmittedBallot] = useState(false);
+  const [votingClosed, setVotingClosed] = useState(false);
+  const [votingClosesAt, setVotingClosesAt] = useState(getVotingClosesAt());
+  const [countdownNow, setCountdownNow] = useState(() => Date.now());
   const inFlightVotesRef = useRef(new Set());
   const votesByFieldRef = useRef({});
   const fieldVersionRef = useRef({});
@@ -109,8 +118,15 @@ const VotingPage = () => {
       mergeFieldData(fieldData, requestStartedAt);
       setVotesByField(voteMap);
       setHasSubmittedBallot(Boolean(voteData.hasSubmittedBallot));
+      const nextVotingClosesAt = voteData.votingClosesAt || getVotingClosesAt();
+      const nextVotingClosed = Boolean(voteData.votingClosed) || isVotingClosedAt(nextVotingClosesAt);
+      setVotingClosed(nextVotingClosed);
+      setVotingClosesAt(nextVotingClosesAt);
       votesByFieldRef.current = voteMap;
       setCurrentFieldIndex(nextIndex);
+      if (nextVotingClosed) {
+        setShowSubmitPrompt(false);
+      }
       subscribeToFieldRooms(fieldData.map((field) => field.id));
     } catch (requestError) {
       setError(requestError.response?.data?.message || 'Unable to load polls.');
@@ -171,6 +187,48 @@ const VotingPage = () => {
   }, [loadVotingData]);
 
   useEffect(() => {
+    if (hasSubmittedBallot || votingClosed) {
+      return undefined;
+    }
+
+    const closeAt = new Date(votingClosesAt).getTime();
+
+    if (Number.isNaN(closeAt)) {
+      return undefined;
+    }
+
+    const timeoutMs = closeAt - Date.now();
+
+    if (timeoutMs <= 0) {
+      setVotingClosed(true);
+      setShowSubmitPrompt(false);
+      return undefined;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setVotingClosed(true);
+      setShowSubmitPrompt(false);
+      setError('');
+    }, timeoutMs);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [hasSubmittedBallot, votingClosed, votingClosesAt]);
+
+  useEffect(() => {
+    if (hasSubmittedBallot || votingClosed) {
+      return undefined;
+    }
+
+    setCountdownNow(Date.now());
+
+    const intervalId = window.setInterval(() => {
+      setCountdownNow(Date.now());
+    }, 1000);
+
+    return () => window.clearInterval(intervalId);
+  }, [hasSubmittedBallot, votingClosed, votingClosesAt]);
+
+  useEffect(() => {
     setCurrentFieldIndex((current) => {
       if (!fields.length) {
         return 0;
@@ -194,7 +252,12 @@ const VotingPage = () => {
 
   const handleVote = useCallback(
     async (fieldId, option) => {
-      if (hasSubmittedBallot || submittingBallot || inFlightVotesRef.current.has(fieldId)) {
+      if (
+        hasSubmittedBallot ||
+        submittingBallot ||
+        votingClosed ||
+        inFlightVotesRef.current.has(fieldId)
+      ) {
         return;
       }
 
@@ -232,7 +295,7 @@ const VotingPage = () => {
           setCurrentFieldIndex((current) => Math.min(current + 1, fields.length - 1));
         }
       } catch (requestError) {
-        if (requestError.response?.status === 409) {
+        if (requestError.response?.status === 403 || requestError.response?.status === 409) {
           await loadVotingData({ showLoader: false });
         } else {
           setError(requestError.response?.data?.message || 'Unable to save your vote.');
@@ -242,14 +305,14 @@ const VotingPage = () => {
         setSubmittingFieldId('');
       }
     },
-    [fields.length, hasSubmittedBallot, loadVotingData, submittingBallot]
+    [fields.length, hasSubmittedBallot, loadVotingData, submittingBallot, votingClosed]
   );
 
   const completedCount = fields.filter((field) => votesByField[field.id]).length;
   const allCategoriesCompleted = fields.length > 0 && completedCount === fields.length;
 
   const handleSubmitBallot = useCallback(async () => {
-    if (!allCategoriesCompleted || submittingBallot) {
+    if (!allCategoriesCompleted || submittingBallot || votingClosed) {
       return;
     }
 
@@ -263,7 +326,7 @@ const VotingPage = () => {
       setShowSubmitPrompt(false);
     } catch (requestError) {
       setShowSubmitPrompt(false);
-      if (requestError.response?.status === 409) {
+      if (requestError.response?.status === 403 || requestError.response?.status === 409) {
         await loadVotingData({ showLoader: false });
       } else {
         setError(requestError.response?.data?.message || 'Unable to submit your ballot.');
@@ -271,7 +334,7 @@ const VotingPage = () => {
     } finally {
       setSubmittingBallot(false);
     }
-  }, [allCategoriesCompleted, loadVotingData, submittingBallot, user?.id]);
+  }, [allCategoriesCompleted, loadVotingData, submittingBallot, user?.id, votingClosed]);
 
   if (hasSubmittedBallot) {
     return <Navigate to="/vote/submitted" replace />;
@@ -283,6 +346,10 @@ const VotingPage = () => {
 
   if (error && !fields.length) {
     return <ErrorState message={error} onRetry={loadVotingData} />;
+  }
+
+  if (votingClosed || isVotingClosedAt(votingClosesAt)) {
+    return <VotingClosedPanel closesAt={votingClosesAt} />;
   }
 
   if (!fields.length) {
@@ -306,6 +373,9 @@ const VotingPage = () => {
         <p className="muted-text">
           Move through each award category with the navigation buttons and cast one secure vote per
           category.
+        </p>
+        <p className="notice-text">
+          Voting closes in {formatVotingCountdown(votingClosesAt, countdownNow)}.
         </p>
         <div className="voting-summary">
           <span className="summary-pill">

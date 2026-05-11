@@ -1,5 +1,5 @@
 const NIGERIA_TIME_ZONE = 'Africa/Lagos';
-const DEFAULT_VOTING_CLOSES_AT = '2026-05-04T00:00:00+01:00';
+const DEFAULT_VOTING_CLOSES_AT = '2026-05-20T00:00:00+01:00';
 
 export const getVotingClosesAt = (value = import.meta.env.VITE_VOTING_CLOSES_AT) =>
   value || DEFAULT_VOTING_CLOSES_AT;
